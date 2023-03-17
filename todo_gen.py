@@ -1,6 +1,8 @@
 import os
 from time import time
 
+from gitignore_parser import parse_gitignore
+
 try:
     import tkinter as tk
     from tkinter import filedialog, ttk
@@ -21,21 +23,31 @@ def get_proj_path() -> None:
 def get_out_path() -> None:
     """Open a directory browser to get the output folder."""
     directory = filedialog.askdirectory()
-    out_path.set(os.path.join(directory, 'TODO.txt') if len(directory) else out_path.get())
+    out_path.set(os.path.join(directory, 'TODO.txt')
+                 if len(directory) else out_path.get())
 
 
 def generate_notes() -> None:
     """Generate the todo notes from the source folder."""
     todo_notes: list[str] = []
-    todo_file = out_path.get()
-    search_str = search_key.get()
+    todo_file: str = out_path.get()
+    search_str: str = search_key.get()
+    src_dir: str = proj_path.get()
     start_time = time()
     txt_notes.configure(state='normal')
     txt_notes.delete(1.0, tk.END)
+    gitignore_path: str = os.path.join(src_dir, '.gitignore')
+    matches: callable = None
 
-    for root, _, files in os.walk(proj_path.get()):
+    if use_gitignore.get() and os.path.exists(gitignore_path):
+        matches = parse_gitignore(gitignore_path)
+
+    for root, _, files in os.walk(src_dir):
         for src_file in files:
             file_path = os.path.join(root, src_file)
+
+            if matches is not None and matches(file_path):
+                continue
 
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -47,7 +59,8 @@ def generate_notes() -> None:
                             substring_start: int = line.index(
                                 search_str) + len(search_str)
                             note: str = line[substring_start:]
-                            todo_notes.append(f'{file_path} ({line_num}): {note}')
+                            todo_notes.append(
+                                f'{file_path} ({line_num}): {note}')
 
                         line = f.readline()
                         line_num += 1
@@ -59,8 +72,9 @@ def generate_notes() -> None:
         with open(todo_file, 'w', encoding='utf-8') as f:
             def out(msg: str):
                 """Output msg to both the gui and the disk."""
-                # Shorten file paths for gui 
-                txt_notes.insert('end', msg.replace(proj_path.get(), '$PROJ') + '\n')
+                # Shorten file paths for gui
+                txt_notes.insert('end', msg.replace(
+                    proj_path.get(), '$PROJ') + '\n')
                 f.write(msg + '\n')
 
             out('List of tasks to do:\n')
@@ -95,27 +109,41 @@ out_path = tk.StringVar()
 out_path.set(os.path.join(os.getcwd(), 'TODO.txt'))
 search_key = tk.StringVar()
 search_key.set('TODO:')
+use_gitignore = tk.IntVar()
+use_gitignore.set(1)
 
 pad_x = 5
 pad_y = 5
 
 # Build root path frame
-tk.Label(text='Project root path:').pack(in_=cont_root_path, padx=pad_x, pady=pad_y, side='left')
-tk.Entry(textvariable=proj_path, width=35).pack(in_=cont_root_path, padx=pad_x, pady=pad_y, side='left')
-tk.Button(text='Browse', command=get_proj_path).pack(in_=cont_root_path, padx=pad_x, pady=pad_y, side='right')
+tk.Label(text='Project root path:').pack(
+    in_=cont_root_path, padx=pad_x, pady=pad_y, side='left')
+tk.Entry(textvariable=proj_path, width=35).pack(
+    in_=cont_root_path, padx=pad_x, pady=pad_y, side='left')
+tk.Button(text='Browse', command=get_proj_path).pack(
+    in_=cont_root_path, padx=pad_x, pady=pad_y, side='right')
 cont_root_path.pack()
 
-tk.Label(text='Write to file:').pack(in_=cont_out_path, padx=pad_x, pady=pad_y, side='left')
-tk.Entry(textvariable=out_path, width=40).pack(in_=cont_out_path, padx=pad_x, pady=pad_y, side='left')
-tk.Button(text='Browse', command=get_out_path).pack(in_=cont_out_path, padx=pad_x, pady=pad_y, side='right')
+tk.Label(text='Write to file:').pack(
+    in_=cont_out_path, padx=pad_x, pady=pad_y, side='left')
+tk.Entry(textvariable=out_path, width=40).pack(
+    in_=cont_out_path, padx=pad_x, pady=pad_y, side='left')
+tk.Button(text='Browse', command=get_out_path).pack(
+    in_=cont_out_path, padx=pad_x, pady=pad_y, side='right')
 cont_out_path.pack()
 
-tk.Label(text='TODO Style:').pack(in_=cont_search_key, padx=pad_x, pady=pad_y, side='left')
-tk.Entry(textvariable=search_key, width=10).pack(in_=cont_search_key, padx=pad_x, pady=pad_y, side='right')
+tk.Label(text='TODO Style:').pack(
+    in_=cont_search_key, padx=pad_x, pady=pad_y, side='left')
+tk.Entry(textvariable=search_key, width=10).pack(
+    in_=cont_search_key, padx=pad_x, pady=pad_y, side='left')
+tk.Checkbutton(text='Use gitignore?', variable=use_gitignore).pack(
+    in_=cont_search_key, padx=pad_x, pady=pad_y, side='right'
+)
 cont_search_key.pack()
 
 tk.Button(text='Generate', command=generate_notes).pack(padx=pad_x, pady=pad_y)
-ttk.Separator(window, orient='horizontal').pack(fill='x', padx=pad_x, pady=pad_y)
+ttk.Separator(window, orient='horizontal').pack(
+    fill='x', padx=pad_x, pady=pad_y)
 txt_notes = tk.Text(state='disabled', wrap=tk.WORD)
 txt_notes.pack(padx=pad_x, pady=pad_y)
 
