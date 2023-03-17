@@ -1,7 +1,8 @@
 import os
+import pathlib
 from time import time
 
-from gitignore_parser import parse_gitignore
+import igittigitt
 
 try:
     import tkinter as tk
@@ -37,16 +38,17 @@ def generate_notes() -> None:
     txt_notes.configure(state='normal')
     txt_notes.delete(1.0, tk.END)
     gitignore_path: str = os.path.join(src_dir, '.gitignore')
-    matches: callable = None
+    ignore = None
 
     if use_gitignore.get() and os.path.exists(gitignore_path):
-        matches = parse_gitignore(gitignore_path)
-
+        ignore = igittigitt.IgnoreParser()
+        ignore.parse_rule_file(pathlib.Path(gitignore_path))
+        
     for root, _, files in os.walk(src_dir):
         for src_file in files:
             file_path = os.path.join(root, src_file)
 
-            if matches is not None and matches(file_path):
+            if ignore is not None and ignore.match(pathlib.Path(file_path)):
                 continue
 
             try:
